@@ -64,14 +64,17 @@
                         <div class="col-md-4">
                             <label class="form-label">Frequency (MHz)</label>
                             <input type="number" @bind="frequency" @bind:event="oninput" 
-                                   class="form-control" min="24" max="1766" step="0.1" />
-                            <div class="form-text">Range: 24MHz - 1766MHz</div>
+                                   class="form-control" 
+                                   min="@currentBandConfig.MinFrequency" 
+                                   max="@currentBandConfig.MaxFrequency" 
+                                   step="@currentBandConfig.Step" />
+                            <div class="form-text">Range: @currentBandConfig.MinFrequency MHz - @currentBandConfig.MaxFrequency MHz</div>
                         </div>
 
                         <!-- Mode Selection -->
                         <div class="col-md-3">
                             <label class="form-label">Mode</label>
-                            <select @bind="selectedMode" class="form-select">
+                            <select @bind="selectedMode" @bind:after="() => OnModeChanged(selectedMode)" class="form-select">
                                 <option value="@RadioMode.FM">FM</option>
                                 <option value="@RadioMode.AM">AM</option>
                                 <option value="@RadioMode.SW">SW</option>
@@ -96,15 +99,65 @@
 
                     <!-- Preset Frequencies -->
                     <div class="mt-3">
-                        <h6>FM Presets</h6>
-                        <div class="btn-group" role="group">
-                            <button class="btn btn-outline-secondary btn-sm" @onclick="() => SetPreset(88.5, RadioMode.FM)">88.5</button>
-                            <button class="btn btn-outline-secondary btn-sm" @onclick="() => SetPreset(95.5, RadioMode.FM)">95.5</button>
-                            <button class="btn btn-outline-secondary btn-sm" @onclick="() => SetPreset(100.1, RadioMode.FM)">100.1</button>
-                            <button class="btn btn-outline-secondary btn-sm" @onclick="() => SetPreset(104.3, RadioMode.FM)">104.3</button>
-                            <button class="btn btn-outline-secondary btn-sm" @onclick="() => SetPreset(107.9, RadioMode.FM)">107.9</button>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">Favorites</h6>
+                            <button class="btn btn-outline-primary btn-sm" @onclick="AddCurrentToFavorites" disabled="@isLoading">
+                                <i class="fas fa-star"></i> Add Current
+                            </button>
                         </div>
+                        @if (favorites.Any())
+                        {
+                            <div class="btn-group flex-wrap" role="group">
+                                @foreach (var fav in favorites)
+                                {
+                                    <div class="btn-group" role="group">
+                                        <button class="btn btn-outline-secondary btn-sm" 
+                                                @onclick="() => LoadFavorite(fav)">
+                                            @fav.Name (@fav.Frequency.ToString("F2")) @fav.Mode
+                                        </button>
+                                        <button class="btn btn-outline-danger btn-sm" 
+                                                @onclick="() => RemoveFavorite(fav.Id)"
+                                                title="Remove">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-muted small">No favorites yet. Click "Add Current" to save a station.</div>
+                        }
                     </div>
+
+                    <!-- Station Metadata -->
+                    @if (currentBandConfig.SupportsMetadata && currentMetadata != null && isStreaming)
+                    {
+                        <div class="mt-3">
+                            <h6>Station Information</h6>
+                            <div class="card">
+                                <div class="card-body">
+                                    @if (!string.IsNullOrEmpty(currentMetadata.StationName))
+                                    {
+                                        <div><strong>Station:</strong> @currentMetadata.StationName</div>
+                                    }
+                                    @if (!string.IsNullOrEmpty(currentMetadata.ProgramService))
+                                    {
+                                        <div><strong>PS:</strong> @currentMetadata.ProgramService</div>
+                                    }
+                                    @if (!string.IsNullOrEmpty(currentMetadata.RadioText))
+                                    {
+                                        <div><strong>RT:</strong> @currentMetadata.RadioText</div>
+                                    }
+                                    @if (!string.IsNullOrEmpty(currentMetadata.Artist) || !string.IsNullOrEmpty(currentMetadata.Title))
+                                    {
+                                        <div><strong>Now Playing:</strong> @currentMetadata.Artist - @currentMetadata.Title</div>
+                                    }
+                                    <small class="text-muted">Updated: @currentMetadata.LastUpdated.ToString("HH:mm:ss")</small>
+                                </div>
+                            </div>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -177,17 +230,48 @@
     private List<SdrDevice>? devices = new();
     private double frequency = 100.1;
     private RadioMode selectedMode = RadioMode.FM;
+    private RadioMode previousMode = RadioMode.FM;
     private int gain = 0;
     private bool isStreaming = false;
     private bool isLoading = false;
     private string? statusMessage;
     private bool isError = false;
     private string? audioStreamUrl;
+    private RadioBandConfig currentBandConfig = RadioBandConfig.GetConfig(RadioMode.FM);
+    private List<RadioFavorite> favorites = new();
+    private StationMetadata? currentMetadata;
 
     protected override async Task OnInitializedAsync()
     {
         await RefreshDevices();
         await LoadCurrentSettings();
+        await LoadFavorites();
+    }
+
+    private void OnModeChanged(RadioMode newMode)
+    {
+        if (newMode != selectedMode)
+        {
+            // Calculate the percentage position in the current band
+            var oldConfig = RadioBandConfig.GetConfig(previousMode);
+            var newConfig = RadioBandConfig.GetConfig(newMode);
+            
+            // Calculate percentage through the old band
+            var percentage = (frequency - oldConfig.MinFrequency) / (oldConfig.MaxFrequency - oldConfig.MinFrequency);
+            
+            // Apply same percentage to new band
+            frequency = newConfig.MinFrequency + (percentage * (newConfig.MaxFrequency - newConfig.MinFrequency));
+            
+            // Ensure frequency is within bounds and properly stepped
+            frequency = Math.Max(newConfig.MinFrequency, Math.Min(newConfig.MaxFrequency, frequency));
+            frequency = Math.Round(frequency / newConfig.Step) * newConfig.Step;
+            
+            previousMode = newMode;
+            selectedMode = newMode;
+            currentBandConfig = newConfig;
+            
+            StateHasChanged();
+        }
     }
 
     private async Task RefreshDevices()
@@ -225,6 +309,8 @@
             {
                 frequency = response.Data.Frequency / 1e6; // Convert Hz to MHz
                 selectedMode = response.Data.Mode;
+                previousMode = response.Data.Mode;
+                currentBandConfig = RadioBandConfig.GetConfig(selectedMode);
                 gain = response.Data.Gain;
                 isStreaming = response.Data.IsStreaming;
             }
@@ -233,6 +319,70 @@
         {
             SetStatusMessage($"Error loading settings: {ex.Message}", true);
         }
+    }
+
+    private async Task LoadFavorites()
+    {
+        try
+        {
+            var favoritesJson = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "radioFavorites");
+            if (!string.IsNullOrEmpty(favoritesJson))
+            {
+                favorites = System.Text.Json.JsonSerializer.Deserialize<List<RadioFavorite>>(favoritesJson) ?? new();
+            }
+        }
+        catch
+        {
+            // If localStorage fails, just use empty list
+            favorites = new();
+        }
+    }
+
+    private async Task SaveFavorites()
+    {
+        try
+        {
+            var favoritesJson = System.Text.Json.JsonSerializer.Serialize(favorites);
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "radioFavorites", favoritesJson);
+        }
+        catch (Exception ex)
+        {
+            SetStatusMessage($"Error saving favorites: {ex.Message}", true);
+        }
+    }
+
+    private async Task AddCurrentToFavorites()
+    {
+        var name = $"{selectedMode} {frequency:F2}";
+        var favorite = new RadioFavorite
+        {
+            Name = name,
+            Frequency = frequency,
+            Mode = selectedMode
+        };
+        
+        favorites.Add(favorite);
+        await SaveFavorites();
+        SetStatusMessage($"Added {name} to favorites", false);
+    }
+
+    private async Task RemoveFavorite(Guid id)
+    {
+        favorites.RemoveAll(f => f.Id == id);
+        await SaveFavorites();
+        SetStatusMessage("Favorite removed", false);
+    }
+
+    private void LoadFavorite(RadioFavorite favorite)
+    {
+        if (favorite.Mode != selectedMode)
+        {
+            previousMode = selectedMode;
+            selectedMode = favorite.Mode;
+            currentBandConfig = RadioBandConfig.GetConfig(selectedMode);
+        }
+        frequency = favorite.Frequency;
+        SetStatusMessage($"Loaded favorite: {favorite.Name}", false);
     }
 
     private async Task ApplySettings()
@@ -326,12 +476,6 @@
         {
             isLoading = false;
         }
-    }
-
-    private void SetPreset(double freq, RadioMode mode)
-    {
-        frequency = freq;
-        selectedMode = mode;
     }
 
     private void SetStatusMessage(string message, bool error)

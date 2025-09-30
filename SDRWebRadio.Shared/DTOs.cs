@@ -35,4 +35,18 @@ namespace SDRWebRadio.Shared.DTOs
         public string Message { get; set; } = string.Empty;
         public T? Data { get; set; }
     }
+
+    public class FavoriteRequest
+    {
+        public string Name { get; set; } = string.Empty;
+        public double Frequency { get; set; }
+        public RadioMode Mode { get; set; }
+    }
+
+    public class MetadataResponse
+    {
+        public bool IsSuccess { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public StationMetadata? Metadata { get; set; }
+    }
 }
