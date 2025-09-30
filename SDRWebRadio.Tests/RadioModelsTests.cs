@@ -111,4 +111,77 @@ public class SdrModelsTests
         Assert.True(response.IsSuccess);
         Assert.Contains("2 devices", response.Message);
     }
+
+    [Theory]
+    [InlineData(RadioMode.FM, 88.0, 108.0, 0.1, true)]
+    [InlineData(RadioMode.AM, 0.53, 1.71, 0.01, false)]
+    [InlineData(RadioMode.SW, 2.3, 26.1, 0.01, false)]
+    public void RadioBandConfig_ShouldReturnCorrectRanges(RadioMode mode, double minFreq, double maxFreq, double step, bool supportsMetadata)
+    {
+        // Act
+        var config = RadioBandConfig.GetConfig(mode);
+
+        // Assert
+        Assert.Equal(mode, config.Mode);
+        Assert.Equal(minFreq, config.MinFrequency);
+        Assert.Equal(maxFreq, config.MaxFrequency);
+        Assert.Equal(step, config.Step);
+        Assert.Equal(supportsMetadata, config.SupportsMetadata);
+    }
+
+    [Fact]
+    public void RadioFavorite_ShouldInitializeWithDefaults()
+    {
+        // Arrange & Act
+        var favorite = new RadioFavorite
+        {
+            Name = "Test Station",
+            Frequency = 100.1,
+            Mode = RadioMode.FM
+        };
+
+        // Assert
+        Assert.NotEqual(Guid.Empty, favorite.Id);
+        Assert.Equal("Test Station", favorite.Name);
+        Assert.Equal(100.1, favorite.Frequency);
+        Assert.Equal(RadioMode.FM, favorite.Mode);
+    }
+
+    [Fact]
+    public void StationMetadata_ShouldSetPropertiesCorrectly()
+    {
+        // Arrange & Act
+        var metadata = new StationMetadata
+        {
+            StationName = "WXYZ FM",
+            ProgramService = "WXYZ",
+            RadioText = "Now Playing: Test Song",
+            Artist = "Test Artist",
+            Title = "Test Title"
+        };
+
+        // Assert
+        Assert.Equal("WXYZ FM", metadata.StationName);
+        Assert.Equal("WXYZ", metadata.ProgramService);
+        Assert.Equal("Now Playing: Test Song", metadata.RadioText);
+        Assert.Equal("Test Artist", metadata.Artist);
+        Assert.Equal("Test Title", metadata.Title);
+    }
+
+    [Fact]
+    public void FavoriteRequest_ShouldValidateProperties()
+    {
+        // Arrange & Act
+        var request = new FavoriteRequest
+        {
+            Name = "My Favorite",
+            Frequency = 95.5,
+            Mode = RadioMode.FM
+        };
+
+        // Assert
+        Assert.Equal("My Favorite", request.Name);
+        Assert.Equal(95.5, request.Frequency);
+        Assert.Equal(RadioMode.FM, request.Mode);
+    }
 }
