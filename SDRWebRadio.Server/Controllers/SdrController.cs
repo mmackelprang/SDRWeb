@@ -107,7 +107,7 @@ namespace SDRWebRadio.Server.Controllers
         }
 
         [HttpGet("audio")]
-        public async Task<IActionResult> GetAudioStream()
+        public IActionResult GetAudioStream()
         {
             try
             {
@@ -118,8 +118,8 @@ namespace SDRWebRadio.Server.Controllers
 
                 // This is a placeholder for audio streaming
                 // In a real implementation, you would stream audio data here
-                Response.Headers.Add("Content-Type", "audio/wav");
-                Response.Headers.Add("Cache-Control", "no-cache");
+                Response.Headers["Content-Type"] = "audio/wav";
+                Response.Headers["Cache-Control"] = "no-cache";
                 
                 // Return empty audio stream for now
                 var silence = new byte[4096];

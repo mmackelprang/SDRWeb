@@ -90,7 +90,7 @@ namespace SDRWebRadio.Server.Services
             };
         }
 
-        public async Task<ApiResponse<bool>> SetRadioSettingsAsync(RadioSettingsRequest settings)
+        public Task<ApiResponse<bool>> SetRadioSettingsAsync(RadioSettingsRequest settings)
         {
             try
             {
@@ -101,22 +101,22 @@ namespace SDRWebRadio.Server.Services
                 _logger.LogInformation("Radio settings updated: Frequency={Frequency}, Mode={Mode}, Gain={Gain}",
                     settings.Frequency, settings.Mode, settings.Gain);
 
-                return new ApiResponse<bool>
+                return Task.FromResult(new ApiResponse<bool>
                 {
                     IsSuccess = true,
                     Data = true,
                     Message = "Settings updated successfully"
-                };
+                });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error setting radio settings");
-                return new ApiResponse<bool>
+                return Task.FromResult(new ApiResponse<bool>
                 {
                     IsSuccess = false,
                     Data = false,
                     Message = "Error updating settings"
-                };
+                });
             }
         }
 
@@ -165,7 +165,7 @@ namespace SDRWebRadio.Server.Services
             }
         }
 
-        public async Task<ApiResponse<bool>> StopStreamAsync()
+        public Task<ApiResponse<bool>> StopStreamAsync()
         {
             try
             {
@@ -183,33 +183,33 @@ namespace SDRWebRadio.Server.Services
 
                 _currentSettings.IsStreaming = false;
 
-                return new ApiResponse<bool>
+                return Task.FromResult(new ApiResponse<bool>
                 {
                     IsSuccess = true,
                     Data = true,
                     Message = "Stream stopped successfully"
-                };
+                });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error stopping stream");
-                return new ApiResponse<bool>
+                return Task.FromResult(new ApiResponse<bool>
                 {
                     IsSuccess = false,
                     Data = false,
                     Message = "Error stopping stream"
-                };
+                });
             }
         }
 
-        public async Task<ApiResponse<RadioSettings>> GetCurrentSettingsAsync()
+        public Task<ApiResponse<RadioSettings>> GetCurrentSettingsAsync()
         {
-            return new ApiResponse<RadioSettings>
+            return Task.FromResult(new ApiResponse<RadioSettings>
             {
                 IsSuccess = true,
                 Data = _currentSettings,
                 Message = "Current settings retrieved"
-            };
+            });
         }
 
         private async Task StartRtlTcpAsync()
@@ -236,7 +236,7 @@ namespace SDRWebRadio.Server.Services
             _logger.LogInformation("rtl_tcp started on {Host}:{Port}", RTL_TCP_HOST, RTL_TCP_PORT);
         }
 
-        private async Task StartRtlFmAsync()
+        private Task StartRtlFmAsync()
         {
             var modeArg = _currentSettings.Mode switch
             {
@@ -263,6 +263,7 @@ namespace SDRWebRadio.Server.Services
             }
 
             _logger.LogInformation("rtl_fm started for {Mode} mode at {Frequency} Hz", _currentSettings.Mode, _currentSettings.Frequency);
+            return Task.CompletedTask;
         }
 
         public void Dispose()
