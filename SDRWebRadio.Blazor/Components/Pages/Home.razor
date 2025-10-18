@@ -239,7 +239,7 @@
     private string? audioStreamUrl;
     private RadioBandConfig currentBandConfig = RadioBandConfig.GetConfig(RadioMode.FM);
     private List<RadioFavorite> favorites = new();
-    private StationMetadata? currentMetadata;
+    private StationMetadata? currentMetadata = null;
 
     protected override async Task OnInitializedAsync()
     {
